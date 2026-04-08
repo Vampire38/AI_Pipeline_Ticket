@@ -1,0 +1,743 @@
+{
+  "name": "AI Lead Intelligence Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        656,
+        96
+      ],
+      "id": "0dc05e31-cd18-4a7e-8e7a-3e8e9d967761",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "website",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        -48
+      ],
+      "id": "2b1954f2-7728-4d2c-a79e-ceebe53bcd39",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f5475293-f2e8-4a69-a9db-58174f758166",
+              "name": "url",
+              "value": "={{ $json.website ? ($json.website.startsWith('http') ? $json.website : 'https://' + $json.website) : '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        -192
+      ],
+      "id": "f6a53a24-edc7-4c38-a10e-b9cec2117d9d",
+      "name": "reconstructing url"
+    },
+    {
+      "parameters": {
+        "url": "={{$json.url}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": "={{ false }}",
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2016,
+        0
+      ],
+      "id": "b8113c2a-9ba4-45af-beb2-4d95b66cdfaa",
+      "name": "fetch website html",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4e9395d7-708a-4026-b051-87c9fac860f9",
+              "leftValue": "={{$json.company}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "0e9da784-e30c-4e12-bc04-866f50fff699",
+              "leftValue": "={{$json.website}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1056,
+        96
+      ],
+      "id": "f2999167-5ef7-443b-9903-491453bb5da3",
+      "name": "validation"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        224
+      ],
+      "id": "3d655446-5594-417a-8a7e-d1bebd0c17ff",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "sT3SqxpuUi0Rfd3R",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        2976,
+        240
+      ],
+      "id": "b8060e1b-0d29-46ff-9cc8-a17446a42240",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "sT3SqxpuUi0Rfd3R",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let data = item.json.output;\n\n  // remove ```json if present\n  if (typeof data === \"string\") {\n    data = data.replace(/```json|```/g, \"\").trim();\n    data = JSON.parse(data);\n  }\n\n  return { json: data };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        -16
+      ],
+      "id": "bc045a18-4512-4f71-8683-9b5c546c3eda",
+      "name": "structuring"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a data extraction and lead intelligence AI.\n\nYour task is to analyze company/lead input data and return a structured JSON object.\n\nSTRICT OUTPUT RULES:\n- Return ONLY valid JSON\n- Do NOT wrap output inside any field like \"output\"\n- Do NOT use markdown (no ``` or ```json)\n- Do NOT include explanations or extra text\n- Do NOT include duplicate JSON blocks\n- Output must be a single JSON object only\n\n---\n\nOUTPUT SCHEMA (MUST FOLLOW EXACTLY):\n\n{\n  \"company_name\": string,\n  \"industry\": string,\n  \"short_description\": string,\n  \"products_or_services\": [string],\n  \"target_customers\": [string],\n  \"value_proposition\": string,\n  \"tone\": string,\n  \"keywords\": [string]\n}\n\n---\n\nRULES:\n- Keep values concise and relevant\n- products_or_services must be an array of strings\n- target_customers must be an array of strings\n- keywords must be 3–8 relevant terms\n- If information is missing, infer logically from context (do NOT leave empty unless impossible)\n\n---\n\nIMPORTANT:\nReturn ONLY the JSON object. Nothing else.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2320,
+        -16
+      ],
+      "id": "454d116e-b83d-4076-a36a-059c9aa1532b",
+      "name": "HTML extracting",
+      "alwaysOutputData": false,
+      "notesInFlow": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "You are a lead scoring engine.\n\nAnalyze the input and return ONLY ONE valid JSON object.\n\nIMPORTANT RULES:\n- Return ONLY ONE result per input lead\n- Do NOT generate multiple examples\n- Do NOT include explanations\n- Do NOT output multiple JSON objects\n- Output must be valid JSON (parsable)\n\nOutput format:\n{\n  \"lead_score\": number (0-100),\n  \"confidence_score\": number (0-1),\n  \"segment\": \"Hot | Warm | Cold\",\n  \"reasoning\": \"\",\n  \"buying_intent_signals\": [],\n  \"risk_factors\": [],\n  \"recommended_action\": \"\"\n}\n\nInput:\n{{$json}}\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2976,
+        -16
+      ],
+      "id": "93803f8c-d700-481d-aba4-5037802864c7",
+      "name": "score generating"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  let raw = item.json.output;\n\n  if (!raw) return { json: {} };\n\n  // remove markdown code blocks\n  if (typeof raw === \"string\") {\n    raw = raw\n      .replace(/```json/g, \"\")\n      .replace(/```/g, \"\")\n      .trim();\n  }\n\n  let parsed;\n\n  try {\n    parsed = typeof raw === \"string\" ? JSON.parse(raw) : raw;\n  } catch (e) {\n    return {\n      json: {\n        error: \"Invalid JSON\",\n        raw_output: raw\n      }\n    };\n  }\n\n  const clean = {};\n\n  // basic fields\n  if (parsed.lead_score != null) clean.lead_score = parsed.lead_score;\n  if (parsed.confidence_score != null) clean.confidence_score = parsed.confidence_score;\n  if (parsed.segment) clean.segment = parsed.segment;\n  if (parsed.reasoning) clean.reasoning = parsed.reasoning;\n  if (parsed.recommended_action) clean.recommended_action = parsed.recommended_action;\n\n  // arrays (ONLY if not empty)\n  if (Array.isArray(parsed.buying_intent_signals) && parsed.buying_intent_signals.length > 0) {\n    clean.buying_intent_signals = parsed.buying_intent_signals;\n  }\n\n  if (Array.isArray(parsed.risk_factors) && parsed.risk_factors.length > 0) {\n    clean.risk_factors = parsed.risk_factors;\n  }\n\n  return { json: clean };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        -16
+      ],
+      "id": "6cdca0eb-662b-457b-aca9-8637d1e600c6",
+      "name": "structyring 1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = items.map(i => i.json);\n\nconst total = leads.length;\n\nconst avgScore =\n  leads.reduce((sum, l) => sum + l.lead_score, 0) / total;\n\nconst hot = leads.filter(l => l.segment === \"Hot\").length;\nconst warm = leads.filter(l => l.segment === \"Warm\").length;\nconst cold = leads.filter(l => l.segment === \"Cold\").length;\n\nconst topLeads = leads\n  .sort((a, b) => b.lead_score - a.lead_score)\n  .slice(0, 3);\n\nreturn [\n  {\n    json: {\n      summary: {\n        total_leads: total,\n        average_lead_score: avgScore,\n        hot_leads: hot,\n        warm_leads: warm,\n        cold_leads: cold\n      },\n      top_leads: topLeads,\n      executive_insight:\n        `Out of ${total} leads, ${hot} are hot, with an average score of ${avgScore.toFixed(1)}. Focus immediate outreach on high-scoring leads.`\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        -16
+      ],
+      "id": "e0604604-c392-4352-b5da-89597bcef3ac",
+      "name": "structuring lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const data = item.json;\n\n  const summary = data.summary || {};\n  const leads = data.top_leads || [];\n\n  const leadRows = leads.map((lead, i) => {\n    return `\n      <tr>\n        <td><b>${i + 1}</b></td>\n        <td>${lead.lead_score ?? \"-\"}</td>\n        <td>${lead.segment ?? \"-\"}</td>\n        <td>${lead.reasoning ?? \"-\"}</td>\n        <td>${lead.recommended_action ?? \"-\"}</td>\n      </tr>\n    `;\n  }).join(\"\");\n\n  const html = `\n  <html>\n    <body style=\"font-family: Arial; background:#f6f6f6; padding:20px;\">\n      \n      <div style=\"max-width:800px; margin:auto; background:#fff; padding:20px; border-radius:10px;\">\n        \n        <h2 style=\"color:#2c3e50;\">📊 Executive Lead Report</h2>\n\n        <h3>📌 Summary</h3>\n        <ul>\n          <li><b>Total Leads:</b> ${summary.total_leads ?? 0}</li>\n          <li><b>Average Score:</b> ${summary.average_lead_score?.toFixed(1) ?? 0}</li>\n          <li><b>🔥 Hot Leads:</b> ${summary.hot_leads ?? 0}</li>\n          <li><b>🟠 Warm Leads:</b> ${summary.warm_leads ?? 0}</li>\n          <li><b>🔵 Cold Leads:</b> ${summary.cold_leads ?? 0}</li>\n        </ul>\n\n        <h3>🏆 Top Leads</h3>\n\n        <table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse: collapse; width:100%;\">\n          <tr style=\"background:#2c3e50; color:white;\">\n            <th>#</th>\n            <th>Score</th>\n            <th>Segment</th>\n            <th>Reasoning</th>\n            <th>Action</th>\n          </tr>\n          ${leadRows}\n        </table>\n\n        <h3>🧠 Executive Insight</h3>\n        <p>${data.executive_insight ?? \"\"}</p>\n\n        <br/>\n        <p style=\"color:gray; font-size:12px;\">\n          Generated by AI Lead Intelligence System\n        </p>\n\n      </div>\n\n    </body>\n  </html>\n  `;\n\n  return {\n    json: {\n      subject: `📊 Lead Report - ${summary.total_leads ?? 0} Leads | Avg Score ${summary.average_lead_score?.toFixed(1) ?? 0}`,\n      html: html\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3824,
+        -16
+      ],
+      "id": "9b757025-3257-4a65-a6c2-ab0983477a33",
+      "name": "email skeleton"
+    },
+    {
+      "parameters": {
+        "sendTo": "vampmr123@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        4048,
+        -16
+      ],
+      "id": "c5e7f64b-5891-4e3c-8e44-71768e3db82d",
+      "name": "final repost mail",
+      "webhookId": "8af1d34f-5f7b-4bf9-8ab4-b9c3e51b585b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "jUYlhPVdQzHR2jh3",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk",
+          "mode": "list",
+          "cachedResultName": "AI Lead Pipeline",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 154007172,
+          "mode": "list",
+          "cachedResultName": "invalid_leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk/edit#gid=154007172"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company": "={{$json.body.company}}",
+            "website": "={{$json.body.website}}",
+            "reason": "incomplete data",
+            "timestamp": "={{$now}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1392,
+        304
+      ],
+      "id": "b6a7072f-4cec-4a49-89fd-9e9e0795e630",
+      "name": "invalid data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1Zp73GwmtLujgoNA",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk",
+          "mode": "list",
+          "cachedResultName": "AI Lead Pipeline",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 449170449,
+          "mode": "list",
+          "cachedResultName": "clean_leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk/edit#gid=449170449"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company": "={{$json.company}}",
+            "website": "={{$json.website}}",
+            "contact_name": "={{$json.contact_name}}",
+            "role": "={{$json.role}}",
+            "source": "={{$json.source}}",
+            "timestamp": "={{$now}}",
+            "notes": "={{$json.notes}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        176
+      ],
+      "id": "cdd19446-3a43-484c-a5e9-d6ceebf47509",
+      "name": "clean data",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1Zp73GwmtLujgoNA",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk",
+          "mode": "list",
+          "cachedResultName": "AI Lead Pipeline",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "leads_raw",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WzMJK6CXxUGWdr4MxN-5rt2TedRxwyzsYHb0qqUn5Fk/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        160,
+        -32
+      ],
+      "id": "57b822fe-7c1e-4165-a93f-aae73251c781",
+      "name": "source 1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1Zp73GwmtLujgoNA",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ed469ff3-30c7-43b8-9102-91290dfbd229",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        160,
+        240
+      ],
+      "id": "121e0f8d-f2cf-4035-978f-25871e905bdf",
+      "name": "source 2",
+      "webhookId": "ed469ff3-30c7-43b8-9102-91290dfbd229"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "reconstructing url",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "clean data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reconstructing url": {
+      "main": [
+        [
+          {
+            "node": "fetch website html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch website html": {
+      "main": [
+        [
+          {
+            "node": "HTML extracting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validation": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "invalid data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "HTML extracting",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "score generating",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "structuring": {
+      "main": [
+        [
+          {
+            "node": "score generating",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML extracting": {
+      "main": [
+        [
+          {
+            "node": "structuring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "score generating": {
+      "main": [
+        [
+          {
+            "node": "structyring 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "structyring 1": {
+      "main": [
+        [
+          {
+            "node": "structuring lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "structuring lead": {
+      "main": [
+        [
+          {
+            "node": "email skeleton",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "email skeleton": {
+      "main": [
+        [
+          {
+            "node": "final repost mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "source 1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "source 2": {
+      "main": [
+        [
+          {
+            "node": "source 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "30769fc8-58de-4117-8ce2-25c187fe6e25",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b53074c533db2a7e2711e7d12d0d14db7a3923ad3e332dd397312b4748bb7806"
+  },
+  "id": "1zBzctAoz3FpcEcV",
+  "tags": [
+    {
+      "name": "Automation",
+      "id": "39XMRNMTkECvEdTY",
+      "updatedAt": "2026-04-08T08:30:24.422Z",
+      "createdAt": "2026-04-08T08:30:24.422Z"
+    },
+    {
+      "name": "Lead Intelligence",
+      "id": "GcT4rXcCCz9pu6Xv",
+      "updatedAt": "2026-04-08T08:30:24.393Z",
+      "createdAt": "2026-04-08T08:30:24.393Z"
+    },
+    {
+      "name": "AI Pipeline",
+      "id": "opC0hspejdPcxHHp",
+      "updatedAt": "2026-04-08T08:30:24.364Z",
+      "createdAt": "2026-04-08T08:30:24.364Z"
+    }
+  ]
+}

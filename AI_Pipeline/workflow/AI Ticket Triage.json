@@ -1,0 +1,484 @@
+{
+  "name": "AI Ticket Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ticket",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fc2ddd15-70c6-4fc6-8ace-ac1cf420da34",
+      "name": "Webhook",
+      "webhookId": "0ec799e8-36f2-4be5-980b-709031398cb1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "533650ab-67ce-4ce3-bb7d-47162e9c7104",
+              "leftValue": "={{$json.body.name}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "2b1b9d21-6d9e-4634-98a4-8b0186eba411",
+              "leftValue": "={{$json.body.email}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "3814f514-fb54-4a09-9a3c-b4e4f88dd47b",
+              "leftValue": "={{$json.body.message}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        192,
+        -16
+      ],
+      "id": "3e101e52-d84c-4068-9f0d-01269bb6473c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e8aad3bd-7863-41b7-86b1-d7a1c1142d23",
+              "name": "ai_input",
+              "value": "={{$json.body.subject + \". \" + $json.body.message}}",
+              "type": "string"
+            },
+            {
+              "id": "2bee9fd6-ce31-4ff0-8e44-e6094e5122c3",
+              "name": "name",
+              "value": "={{$json.body.name}}",
+              "type": "string"
+            },
+            {
+              "id": "ab6b2e6e-083f-44cf-a699-fc0db2f75a61",
+              "name": "email",
+              "value": "={{$json.body.email}}",
+              "type": "string"
+            },
+            {
+              "id": "5a78bc49-fa00-44d8-8999-d27f22fa0516",
+              "name": "subject",
+              "value": "={{$json.body.subject}}",
+              "type": "string"
+            },
+            {
+              "id": "7f762c5f-7f06-4b45-8255-2c3135c9c136",
+              "name": "message",
+              "value": "={{$json.body.message}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "cb92e001-8519-43a7-bb06-aaf1561ab872",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.body || $json.json || $json;\n\nreturn [\n  {\n    json: {\n      name: data.name || \"\",\n      email: data.email || \"\",\n      subject: data.subject || \"\",\n      message: data.message || \"\",\n\n      ai_input: `${data.subject || \"\"} ${data.message || \"\"}`.trim(),\n\n      rule_category: \"billing\",\n      rule_priority: \"high\"\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "dd294b90-925b-43f0-8045-dc59e92ea632",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer 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\",\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a support ticket AI. Return ONLY JSON with keys: category, priority, summary, draft_reply.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{$json.ai_input}}\"\n    }\n  ],\n  \"temperature\": 0.2\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "10b5e02b-af04-4386-bcf8-fd7f76964bc2",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1g4PZ5VbgvJJ3jAXGYxIB1kHeUwX7aqunpnXyrRKS_KM",
+          "mode": "list",
+          "cachedResultName": "Ticket_ai",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1g4PZ5VbgvJJ3jAXGYxIB1kHeUwX7aqunpnXyrRKS_KM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1g4PZ5VbgvJJ3jAXGYxIB1kHeUwX7aqunpnXyrRKS_KM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{$json.name}}",
+            "email": "={{$json.email}}",
+            "subject": "={{$json.subject}}",
+            "message": "={{$json.message}}",
+            "category": "={{$json.category}}",
+            "priority": "={{$json.priority}}",
+            "summary": "={{$json.summary}}",
+            "draft_reply": "={{$json.draft_reply}}",
+            "timestamp": "={{$json.timestamp}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft_reply",
+              "displayName": "draft_reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        -96
+      ],
+      "id": "85406e70-c8cd-411e-a6ad-39acab409d3c",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "1Zp73GwmtLujgoNA",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0bc1856-707d-4608-9870-4aa382a9f69c",
+              "name": "status",
+              "value": "Rejected",
+              "type": "string"
+            },
+            {
+              "id": "863e5fa5-4a81-4a33-8b55-15963f51730d",
+              "name": "reason",
+              "value": "Missing required fields (name, email, or message)",
+              "type": "string"
+            },
+            {
+              "id": "3f8566ff-7f17-4293-9542-95f5451546a5",
+              "name": "message",
+              "value": "Your ticket was not processed. Please provide name, email, and message.",
+              "type": "string"
+            },
+            {
+              "id": "871f9144-1915-4d77-90a1-3412252ea94f",
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        400,
+        64
+      ],
+      "id": "ff15b390-d272-4e3d-8ce7-ff6164940510",
+      "name": "Edit Fields1",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.email}}",
+        "subject": "=Re: {{$json.subject}} - Support Ticket Update",
+        "message": "=Hi {{$json.name || \"User\"}},\n\nWe have received and reviewed your support request.\n\n📝 Your Issue\n{{$json.message}}\n\n📌 Ticket Details\n\nTicket ID: {{$json.ticket_id || \"N/A\"}}\nPriority: {{$json.priority || \"Normal\"}}\nTime: {{$json.timestamp}}\n\n\nOur support team will review your case and get back to you shortly if any additional information is required.\n\nIf you need further assistance, please reply to this email.\n\nThanks & Regards,  \nSupport Team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1456,
+        -80
+      ],
+      "id": "409b7d5a-ec12-4db8-9ad7-c8e92b216824",
+      "name": "Send a message",
+      "webhookId": "4704a4b7-65d4-467c-8f66-a18520cf2fc8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "jUYlhPVdQzHR2jh3",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.choices[0].message.content;\n\n// convert string → JSON object\nconst ai = JSON.parse(raw);\n\n// get original webhook data\nconst original = $node[\"Edit Fields\"].json;\n\nreturn [\n  {\n    json: {\n      ticket_id: \"TK-\" + Date.now(),\n      name: original.name,\n      email: original.email,\n      subject: original.subject,\n      message: original.message,\n\n      category: ai.category,\n      priority: ai.priority,\n      summary: ai.summary,\n      draft_reply: ai.draft_reply,\n\n      timestamp: new Date().toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "ebfdbf88-713f-49d1-b067-aa9855b31b31",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "b2f26c69-e213-4bd8-b9ac-8d00973444a7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b53074c533db2a7e2711e7d12d0d14db7a3923ad3e332dd397312b4748bb7806"
+  },
+  "id": "QS5DqrhkvEEvGpFw",
+  "tags": []
+}
